@@ -1,0 +1,38 @@
+node{
+    def mavenHome = tool name: 'maven3.8.6'
+stage('1clonecode'){
+    git "https://github.com/samuel-ops97/maven-web-application"
+}
+stage('2test&build'){
+    sh "${mavenHome}/bin/mvn clean package"
+}
+stage('3codequality'){
+    sh "${mavenHome}/bin/mvn sonar:sonar"
+}
+stage('4uploadartifacts'){
+    sh "${mavenHome}/bin/mvn deploy"
+}
+stage('5deploy2UAT'){
+    sh "echo 'deploy to UAT' "
+    deploy adapters: [tomcat9(credentialsId: 'tomcat-credentials', path: '', url: 'http://3.95.26.246:8080/')], contextPath: null, war: 'target/*war'
+}
+
+stage('6approvalGate'){
+    sh "echo 'ready for review' "
+    timeout(time:5, unit: 'DAYS'){
+        input message: 'Application ready for deployment, review and approve'
+    }
+}
+    stage('7deploy2prod'){
+        deploy adapters: [tomcat9(credentialsId: 'tomcat-credentials', path: '', url: 'http://3.95.26.246:8080/')], contextPath: null, war: 'target/*war'
+        
+    }
+    stage('8emailNotification'){
+        
+    
+    emailext body: '''Hi, guys
+All hands on this.
+
+@teztehtech''', recipientProviders: [developers(), buildUser(), contributor(), requestor(), brokenBuildSuspects(), upstreamDevelopers()], subject: 'check build status', to: 'samuelmunoh@gmail.com'
+}
+}
